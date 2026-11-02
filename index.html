@@ -1,0 +1,65 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Golf Scorer</title>
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#14532d">
+<style>
+*{box-sizing:border-box}body{margin:0;font:16px system-ui,sans-serif;background:#f1f3ee;color:#16211a}
+header{background:#14532d;position:sticky;top:0;z-index:5;padding-top:env(safe-area-inset-top)}
+nav{display:flex;overflow-x:auto}nav button{flex:1;min-width:66px;padding:12px 4px;background:none;border:0;border-bottom:3px solid transparent;color:#bbf7d0;font-size:13px}nav button.on{color:#fff;border-color:#fff;font-weight:700}nav button:disabled{opacity:.35}
+main{padding:14px;max-width:640px;margin:auto;padding-bottom:calc(30px + env(safe-area-inset-bottom))}
+label{display:block;font-size:13px;margin:12px 0 4px;color:#4b5563}input,select{width:100%;padding:11px;font-size:16px;border:1px solid #c9cfc6;border-radius:8px;background:#fff}
+.btn{padding:13px;border:0;border-radius:10px;background:#14532d;color:#fff;font-size:16px;width:100%;margin-top:12px}.btn.g{background:#6b7280}
+.card{background:#fff;border-radius:10px;padding:12px;margin:10px 0;border-left:8px solid var(--c)}
+.pad{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:10px}.pad button{padding:12px 0;font-size:18px;border:1px solid #c9cfc6;border-radius:8px;background:#fff}.pad button.on{background:var(--c);color:#fff;border-color:var(--c)}
+.r{display:flex;gap:8px;align-items:center}.r>*{flex:1}.big{font-size:30px;font-weight:700}.pt{text-align:center;border-radius:6px;padding:4px;font-weight:700}
+.sc{overflow-x:auto;background:#fff;margin:10px 0}table{border-collapse:collapse;font-size:13px;min-width:100%}td,th{border:1px solid #ddd;padding:7px 5px;text-align:center;white-space:nowrap}td:first-child,th:first-child{position:sticky;left:0;background:#fff;text-align:left;font-weight:600}
+.sc input{padding:6px;width:56px;text-align:center}.msg{color:#b91c1c;font-size:13px}
+@media print{@page{size:A4 landscape;margin:10mm}header,.noprint{display:none}body{background:#fff}main{max-width:none;padding:0}td:first-child{position:static}.sc{overflow:visible}*{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+</style></head><body><header><nav id="nav"></nav></header><main id="main"></main>
+<script>
+const $=s=>document.querySelector(s),C=['#2563eb','#ea580c','#16a34a','#9333ea'],T=['Venue','Players','Format','Holes','Play','Card'];
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+const scores=()=>[0,1,2,3].map(()=>Array(18).fill(null));
+const blank=()=>({v:'',d:new Date().toISOString().slice(0,10),st:1,f:'stb',p:[0,1,2,3].map(()=>({n:'',x:'',h:''})),par:Array(18).fill(''),si:Array(18).fill(''),sc:scores(),cur:0,tab:0});
+let S,K;try{S=JSON.parse(localStorage.golfR)||blank()}catch(e){S=blank()}
+try{K=JSON.parse(localStorage.golfC)||{}}catch(e){K={}}
+const save=()=>{try{localStorage.golfR=JSON.stringify(S);localStorage.golfC=JSON.stringify(K)}catch(e){}nav()};
+const act=()=>S.p.map((p,i)=>({...p,i})).filter(p=>p.n.trim());
+const siOk=()=>S.si.map(Number).sort((a,b)=>a-b).every((v,i)=>v==i+1);
+const parOk=()=>S.par.every(v=>v>=3&&v<=6);
+const ready=()=>S.v.trim()&&act().length&&act().every(p=>p.h!==''&&!isNaN(p.h))&&siOk()&&parOk();
+const hole=k=>(S.st-1+k)%18;
+const stk=(H,si)=>{H=Math.round(H)||0;return Math.floor(H/18)+(si<=H%18?1:0)};
+const pts=(i,h)=>{const g=S.sc[i][h];if(g===null)return null;if(g<0)return 0;return Math.max(0,2+ +S.par[h]-(g-stk(S.p[i].h,+S.si[h])))};
+const best=h=>{const a=act().map(p=>pts(p.i,h));if(a.some(v=>v===null))return null;a.sort((x,y)=>y-x);return a[0]+(a[1]||0)};
+const pc=v=>v===null?'':['#fecaca','#fde68a','#e5e7eb','#bbf7d0','#fde047'][Math.min(v,4)];
+const firstOpen=()=>{for(let k=0;k<18;k++)if(act().some(p=>S.sc[p.i][hole(k)]===null))return k;return 17};
+function nav(){$('#nav').innerHTML=T.map((t,i)=>`<button class="${S.tab==i?'on':''}" ${i>3&&!ready()?'disabled':''} onclick="go(${i})">${i+1}. ${t}</button>`).join('')}
+function go(t){S.tab=t;save();draw();scrollTo(0,0)}
+function draw(){nav();[v0,v1,v2,v3,v4,v5][S.tab]($('#main'))}
+function v0(m){m.innerHTML=`<label>Saved course</label><select onchange="pick(this.value)"><option value="">Pick a saved course</option>${Object.keys(K).map(k=>`<option>${esc(k)}</option>`).join('')}</select>
+<label>Venue (add the tees if they differ)</label><input value="${esc(S.v)}" oninput="S.v=this.value;save()">
+<label>Date</label><input type="date" value="${S.d}" onchange="S.d=this.value;save()">
+<label>Starting hole</label><select onchange="setSt(+this.value)">${[...Array(18)].map((_,i)=>`<option ${S.st==i+1?'selected':''}>${i+1}</option>`).join('')}</select>
+<button class="btn g" onclick="newR()">Start a new round</button>`}
+function pick(k){if(!k)return;S.v=k;S.par=K[k].par.slice();S.si=K[k].si.slice();save();draw()}
+function setSt(n){const o=S.st;if(S.sc.some(r=>r.some(x=>x!==null))&&confirm('Scores are already entered.\nOK = move the entered scores onto the correct holes.\nCancel = keep scores where they are and only change where play continues.')){const s=((n-o)%18+18)%18;S.sc=S.sc.map(r=>r.map((_,h)=>r[(h-s+18)%18]))}S.st=n;S.cur=firstOpen();save();draw()}
+function newR(){if(confirm('Start a new round? Scores are cleared. Saved courses are kept.')){S.sc=scores();S.cur=0;S.d=new Date().toISOString().slice(0,10);S.tab=0;save();draw()}}
+function v1(m){m.innerHTML=S.p.map((p,i)=>`<div class="card" style="--c:${C[i]}"><b style="color:${C[i]}">Player ${i+1}</b><input placeholder="Name" value="${esc(p.n)}" oninput="S.p[${i}].n=this.value;save()"><div class="r"><div><label>WHS Index</label><input inputmode="decimal" value="${esc(p.x)}" oninput="S.p[${i}].x=this.value;save()"></div><div><label>Course Handicap</label><input inputmode="numeric" value="${esc(p.h)}" oninput="S.p[${i}].h=this.value;save()"></div></div></div>`).join('')+'<p class="msg">Leave a name blank to leave that player out. The Course Handicap is used exactly as typed.</p>'}
+function v2(m){m.innerHTML=[['stb','Individual Stableford'],['4b','4-Ball Alliance (2 to count)']].map(([k,t])=>`<button class="btn ${S.f==k?'':'g'}" onclick="S.f='${k}';save();draw()">${t}</button>`).join('')+'<p>Both formats are always calculated. Your choice decides which is shown first on the scorecard.</p>'}
+function v3(m){m.innerHTML=`<div class="sc"><table><tr><th>Hole</th><th>Par</th><th>SI</th></tr>${S.par.map((_,h)=>`<tr><td>${h+1}</td><td><input inputmode="numeric" value="${S.par[h]}" oninput="S.par[${h}]=this.value;save();chk()"></td><td><input inputmode="numeric" value="${S.si[h]}" oninput="S.si[${h}]=this.value;save();chk()"></td></tr>`).join('')}</table></div><p class="msg" id="ck"></p><button class="btn" onclick="saveC()">Save course for next time</button>${K[S.v.trim()]?'<button class="btn g" onclick="delC()">Delete saved course</button>':''}`;chk()}
+function chk(){$('#ck').textContent=[parOk()?'':'Every par must be 3 to 6.',siOk()?'':'SI must use each number from 1 to 18 once.'].join(' ')}
+function saveC(){if(!S.v.trim())return alert('Enter the venue on the Venue tab first.');if(!parOk()||!siOk())return alert('Fix the par and SI first.');K[S.v.trim()]={par:S.par.map(Number),si:S.si.map(Number)};save();draw();alert('Course saved.')}
+function delC(){if(confirm('Delete this saved course?')){delete K[S.v.trim()];save();draw()}}
+function v4(m){const k=S.cur,h=hole(k);m.innerHTML=`<div class="r"><div><div class="big">Hole ${h+1}</div>${k+1} of 18</div><div style="text-align:right"><b>Par ${S.par[h]}</b><br>SI ${S.si[h]}</div></div>`+act().map(p=>{const g=S.sc[p.i][h],s=stk(p.h,+S.si[h]),q=pts(p.i,h);return `<div class="card" style="--c:${C[p.i]}"><div class="r"><b style="color:${C[p.i]}">${esc(p.n)}</b><span>${s?s+' stroke'+(s>1?'s':''):'no stroke'}</span><div class="pt" style="background:${pc(q)}">${q===null?'–':q+' pts'}</div></div><div class="pad">${[1,2,3,4,5,6,7,8,9,10,11].map(n=>`<button class="${g===n?'on':''}" onclick="sc(${p.i},${h},${n})">${n}</button>`).join('')}<button class="${g===-1?'on':''}" onclick="sc(${p.i},${h},-1)">NR</button></div></div>`}).join('')+`<div class="r">${k?'<button class="btn g" onclick="prev()">Previous hole</button>':''}<button class="btn" onclick="next()">${k==17?'Finish round':'Next hole'}</button></div>`}
+function sc(i,h,n){S.sc[i][h]=n;save();draw()}
+function next(){if(act().some(p=>S.sc[p.i][hole(S.cur)]===null)&&!confirm('Not every score is entered for this hole. Continue anyway?'))return;if(S.cur==17)return go(5);S.cur++;save();draw();scrollTo(0,0)}
+function prev(){if(confirm('Go back to the previous hole?')){S.cur--;save();draw()}}
+function ed(i,h){if(!confirm('Edit '+S.p[i].n+' on hole '+(h+1)+'?'))return;const v=prompt('Gross score (0 = no score, blank = clear)');if(v===null||isNaN(v))return;S.sc[i][h]=v===''?null:+v===0?-1:+v;save();draw()}
+function v5(m){const A=act(),H=[...Array(18).keys()],sum=(f,a,b)=>{let t=0,n=0;for(let h=a;h<b;h++){const v=f(h);if(typeof v=='number'){t+=v;n++}}return n?t:'–'};
+const row=(l,f,o={})=>{const c=h=>{const v=f(h);return `<td style="${o.sh&&typeof v=='number'?'background:'+pc(o.sh(v)):''}" ${o.ed!=null?`onclick="ed(${o.ed},${h})"`:''}>${v===null?'':v}</td>`},s=(a,b)=>`<td><b>${sum(f,a,b)}</b></td>`;return `<tr><td style="${o.c?'color:'+o.c:''}">${l}</td>${H.slice(0,9).map(c).join('')}${s(0,9)}${H.slice(9).map(c).join('')}${s(9,18)}${s(0,18)}</tr>`};
+const hd=`<tr><th>Hole</th>${H.slice(0,9).map(h=>`<th>${h+1}</th>`).join('')}<th>OUT</th>${H.slice(9).map(h=>`<th>${h+1}</th>`).join('')}<th>IN</th><th>TOTAL</th></tr>`;
+const stb=`<div>Stableford: ${A.map(p=>`<span style="color:${C[p.i]}"><b>${esc(p.n)}</b> ${sum(h=>pts(p.i,h),0,18)}</span>`).join(' &nbsp; ')}</div>`,fb=`<div>4-Ball Alliance: <b>${sum(best,0,18)}</b></div>`;
+m.innerHTML=`<h2 style="margin:0">${esc(S.v)}</h2><div>${S.d}${S.st>1?' · started on hole '+S.st:''}</div><p>${S.f=='stb'?stb+fb:fb+stb}</p><div class="sc"><table>${hd}${row('Par',h=>+S.par[h])}${row('SI',h=>+S.si[h])}${A.map(p=>row(esc(p.n)+' (gross)',h=>{const g=S.sc[p.i][h];return g===null?null:g<0?'NR':g},{c:C[p.i],ed:p.i})+row('Stableford',h=>pts(p.i,h),{c:C[p.i],sh:v=>v})).join('')}${row('4-Ball Alliance',best,{sh:null})}</table></div>
+<div class="noprint"><p>Tap a gross score to correct it. To save a PDF, tap the button and choose Save as PDF (or Print, then share).</p><button class="btn" onclick="print()">Save scorecard as PDF</button><button class="btn g" onclick="go(4)">Back to play</button></div>`}
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+draw();
+</script></body></html>
